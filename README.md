@@ -104,7 +104,7 @@ exit 0
 ```
 
 ### Clone git repo
-Note: default location is `/opt` however if you need to change this rememebr to update file paths
+Note: default location is `/opt` however if you need to change this rememebr to update `WORKDIR` in `congif.py`
 ```
 cd /opt
 git clone https://github.com/mikeslowik/ovfset.git
@@ -137,3 +137,7 @@ DNS: 8.8.8.8, 8.8.4.4
 2021-08-25 15:24:59 [INFO] Creating State file
 2021-08-25 15:25:04 [INFO] Rebooting the system...
 ```
+- check if your network adapter logical name matches templates and adapt the following files and their content accordingly:
+  - `NETPLAN_TPL` (current: `ens160`)
+  - `IFCFG_TPL` (current: `ens192`)
+  - `IFCFG` (current: `ens192`)

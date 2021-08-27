@@ -2,21 +2,7 @@ from datetime import datetime
 from time import sleep
 from os import path, system
 from lxml import etree
-
-STATE='/opt/ovfset/state'
-TMPXML = '/tmp/ovf_env.xml'
-OSRELEASE = '/etc/os-release'
-# customize NIC name to your system in NETPLAN_TPL or IFCFG_TPL template file
-NETPLAN_TPL = '/opt/ovfset/netplan-config.tpl'
-NETPLAN_CFG = '/tmp/01-netcfg.yaml'
-IFCFG_TPL = '/opt/ovfset/ifcfg-ens192'
-IFCFG = '/etc/sysconfig/network-scripts/ifcfg-ens192'
-banner = """
-*******************************************
-*            OVF Config script            *
-* System will be rebooted after execution *
-*******************************************
-"""
+from config import *
 
 def check_os(osrel_file=OSRELEASE):
     osname = ''
