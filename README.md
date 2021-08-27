@@ -14,7 +14,7 @@ Note: if you want to use the script in OVF template remember to remoce `state` l
 - installed and running VMware tools
 - rc.local script (see example below)
 
-### Enable Virtual Machine vApp Operations
+### Enable Virtual Machine vApp Options
 Please refer to VMware documentation for enabling and setting vApp Options, eg. https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.vm_admin.doc/GUID-A6F34BAC-BF8B-4513-AB8C-14891B439D2D.html
 
 ### Install Python and lxml library
