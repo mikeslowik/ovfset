@@ -1,6 +1,7 @@
+from subprocess import run, PIPE
 from datetime import datetime
 from time import sleep
-from os import path, system
+from os import path
 from lxml import etree
 from config import *
 
@@ -49,8 +50,8 @@ def generate_netplan(ip_mask, gateway, dns1, dns2, netplan_tpl=NETPLAN_TPL, netp
     with open(netplan_cfg, 'w+') as netplan_cfg_file:
         netplan_cfg_file.write(netplan)
     # save new netplan in /etc/netplan and apply new settings
-    system('mv ' + netplan_cfg + ' /etc/netplan/')
-    system('netplan apply')
+    run(f'mv {netplan_cfg} /etc/netplan/', shell=True)
+    run('netplan apply', shell=True)
 
 def generate_network_scripts(ip, netmask, gateway, dns1, dns2, ifcfg_tpl=IFCFG_TPL, ifcfg=IFCFG):
     # generate network script (IFCFG) for ens192 NIC based on IFCFG_TPL template
@@ -65,47 +66,69 @@ def generate_network_scripts(ip, netmask, gateway, dns1, dns2, ifcfg_tpl=IFCFG_T
     with open(ifcfg, 'w+') as ifcfg_file:
         ifcfg_file.write(ifcfgtpl)
     # restart NetworkManager to load new configuration
-    system('systemctl restart NetworkManager')
+    run('systemctl restart NetworkManager', shell=True)
 
-def setup_network(state, tmpxml, osname):
+
+def set_motd_warning(noip_warn_file=NOIP_WARN):
+    print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] Setting MOTD warning: {noip_warn_file}')
+    run(f'cp {noip_warn_file} /etc/update-motd.d/', shell=True)
+
+
+def remove_motd_warning(noip_warn_file=NOIP_WARN):
+    motd_warn = path.join('/etc/update-motd.d/', path.basename(noip_warn_file))
+    if path.isfile(motd_warn):
+        print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] Removing MOTD warning: {motd_warn}')
+        run(f'rm -f {motd_warn}', shell=True)
+
+
+def setup_network(state, tmpxml, osname, banner=BANNER):
     if path.isfile(state):
         print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] {state} file exists. Doing nothing.')
         exit()
     else:
         print(banner)
+        
         # create XML file with settings
         print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] Fetching values from vmtools...')
-        system('vmtoolsd --cmd "info-get guestinfo.ovfenv" > ' + tmpxml)
+        run(f'vmtoolsd --cmd "info-get guestinfo.ovfenv" > {tmpxml}', shell=True)
         if not path.isfile(tmpxml):
-            print('[ERROR] ' + tmpxml + ' file does not exist!')
-            print('[ERROR] Check if vmtoolsd --cmd "info-get guestinfo.ovfenv" command works correcty.')
-            print('[ERROR] Aborting.')
+            print(f'{datetime.now().strftime("%Y-%m-%d %X")} [ERROR] {tmpxml} file does not exist!')
+            print(f'{datetime.now().strftime("%Y-%m-%d %X")} [ERROR] Check if vmtoolsd --cmd "info-get guestinfo.ovfenv" command works correcty.')
+            print(f'{datetime.now().strftime("%Y-%m-%d %X")} [ERROR] Aborting.')
             exit()
 
         # get network settings from TMPXML file
         print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] Parsing xml...')
-        dns1 = ''
-        dns2 = ''
         # parse xml output to dictionary
         vm_settings = parse_xml(tmpxml)
         ip = vm_settings.get('IP')
         netmask = vm_settings.get('Netmask')
-        netmask_cidr = netmask_to_cidr(netmask)
-        ip_mask = ip + '/' + str(netmask_cidr)
+        if netmask:
+            netmask_cidr = netmask_to_cidr(netmask)
+            ip_mask = ip + '/' + str(netmask_cidr)
         gateway = vm_settings.get('Gateway')
         dns1 = vm_settings.get('DNS1')
         dns2 = vm_settings.get('DNS2')
-        if not dns2:
+        if not dns1 and not dns2:
+            dns = ''
+        elif dns1 and not dns2:
             dns = dns1
+        elif not dns1 and dns2:
+            dns = dns2
         else:
-            dns = dns1 + ', ' + dns2
-        print('### VM settings ###')
-        print(f'IP: {ip}')
-        print(f'Netmask: ' + vm_settings.get('Netmask'))
-        print(f'IP_MASK: {ip_mask}')
-        print(f'GW: {gateway}')
-        print(f'DNS: {dns}')
-        print()
+            dns = f'{dns1}, {dns2}'
+        print('\n### VM OVF vApp settings ###')
+        print(f'IP address: {ip}')
+        print(f'Netmask: {netmask}')
+        print(f'Gateway address: {gateway}')
+        print(f'DNS: {dns}\n')
+
+        # check if netmask, IP and Gateway addresses have been provided - set MOTD warning and stop execution here
+        if not ip or not netmask or not gateway:
+            print(f'{datetime.now().strftime("%Y-%m-%d %X")} [ERROR] Netmask, IP or Gateway address missing - cannot set VM IP address!')
+            print(f'{datetime.now().strftime("%Y-%m-%d %X")} [ERROR] Please review VM vApp Options or modify /etc/netplan/01-netcfg.yaml manually and restart the system.\n')
+            set_motd_warning()
+            exit()
 
         if osname in 'ubuntu':
             # on Ubuntu - setup network using netplan
@@ -119,18 +142,29 @@ def setup_network(state, tmpxml, osname):
             print(f'{datetime.now().strftime("%Y-%m-%d %X")} [ERROR] Unknown OS version: {osname}')
             exit()
 
-        # Notification for future
+        # check if IP address has been set
+        check = run(f'ip a | grep -c {ip}', shell=True, stdout=PIPE, text=True)
+        if int(check.stdout) < 1:
+            print(f'{datetime.now().strftime("%Y-%m-%d %X")} [ERROR] VM IP address not set!')
+            print(f'{datetime.now().strftime("%Y-%m-%d %X")} [ERROR] Please review VM vApp Options or modify /etc/netplan/01-netcfg.yaml manually and restart the system.\n')
+            set_motd_warning()
+            exit()
+        
+        # Notification for future in case IP address has been set successfully
         print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] IMPORTANT: This script will not be executed on next boot if {state} file exists')
         print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] IMPORTANT: If you want to execute this configuration on Next boot remove {state} file')
 
         print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] Creating State file')
         with open(state, 'w+') as state_file:
             state_file.write(datetime.now().strftime("%Y-%m-%d %X"))
+            
+        # check if MOTD exisis and remove/update
+        remove_motd_warning()
 
         # Wait a bit and reboot
         sleep(5)
         print(f'{datetime.now().strftime("%Y-%m-%d %X")} [INFO] Rebooting the system...\n')
-        system('reboot')
+        run('reboot')
 
 if __name__ == "__main__":
     setup_network(STATE, TMPXML, check_os())

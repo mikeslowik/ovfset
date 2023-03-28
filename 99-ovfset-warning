@@ -1,0 +1,12 @@
+#!/bin/bash
+echo -e "\n\n\E[0;31m"
+echo "###########################################"     
+echo "#                                         #"
+echo "#                 WARNING!                #"
+echo "#      IP address has not been set!       #"
+echo "#     Please review VM vApp Options       #"
+echo "#  or modify /etc/netplan/01-netcfg.yaml  #"
+echo "#    manually and restart the system.     #"
+echo "#                                         #"
+echo "###########################################"
+echo -e "\E[0;39m\n\n"

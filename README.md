@@ -1,7 +1,7 @@
 # ovfset
 ovfset is a simple Python script allowing to set VMware Virtual Machine network settings using VM vApp Options properties passed through vmtoolsd. On VM side it is launched via /etc/rc.local. Successful run creates lock file (default: /opt/ovfset/state) so that the script isn't run on the next reboot.
 
-Note: if you want to use the script in OVF template remember to remoce `state` lock file before exporting OVF template.
+Note: if you want to use the script in OVF template remember to remove `state` lock file before exporting OVF template.
 
 ## pre-requisites
 - enabled and set vApp Options with the following Properties
